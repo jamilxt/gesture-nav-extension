@@ -1,32 +1,25 @@
 // Two-Finger Gesture Navigation - Content Script
+// Depends on constants.js (loaded before this script via manifest)
 
 (function() {
   'use strict';
 
-  // Default settings
-  const DEFAULT_SETTINGS = {
-    enabled: true,
-    sensitivity: 100,      // Delta threshold to trigger gesture
-    cooldown: 300,         // Cooldown between gestures in ms
-    reverseDirection: true, // Reverse swipe direction (default)
-    showIndicator: false,  // Show visual indicator (disabled by default)
-    indicatorColor: '#4285f4',
-    indicatorSize: 60,
-    indicatorPosition: 'bottom-right' // 'sides', 'center', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'
-  };
-
-  let settings = { ...DEFAULT_SETTINGS };
+  let settings = validateSettings(DEFAULT_SETTINGS);
   let wheelTimeout = null;
   let accumulatedDeltaX = 0;
   let lastGestureTime = 0;
   let indicator = null;
   let indicatorTimeout = null;
 
-  // Load settings from storage
+  // Load settings from storage with validation
   function loadSettings() {
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
-        settings = { ...DEFAULT_SETTINGS, ...result };
+        if (chrome.runtime.lastError) {
+          console.error('Failed to load settings:', chrome.runtime.lastError.message);
+          return;
+        }
+        settings = validateSettings(result);
       });
     }
   }
@@ -35,10 +28,20 @@
   if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local') {
-        for (let key in changes) {
-          if (key in settings) {
-            settings[key] = changes[key].newValue;
+        const updated = { ...settings };
+        for (const key in changes) {
+          if (key in updated) {
+            updated[key] = changes[key].newValue;
           }
+        }
+        const wasEnabled = settings.enabled;
+        settings = validateSettings(updated);
+
+        // Reset accumulated delta when disabled to prevent ghost navigations
+        if (wasEnabled && !settings.enabled) {
+          accumulatedDeltaX = 0;
+          clearTimeout(wheelTimeout);
+          wheelTimeout = null;
         }
       }
     });
@@ -50,13 +53,10 @@
 
     removeIndicator();
 
-    const offset = 100; // pixels from center
-    const margin = 80; // pixels from edge for corners
+    const offset = 100;
+    const margin = 80;
     let xPos, yPos;
     const position = settings.indicatorPosition || 'sides';
-
-    // Calculate position based on action (what will happen)
-    let positionForLayout = action;
 
     if (position === 'center') {
       xPos = '50%';
@@ -81,16 +81,11 @@
       yPos = `calc(100% - ${margin}px)`;
     } else {
       // 'sides' - default behavior
-      xPos = positionForLayout === 'back' ? `calc(50% - ${offset}px)` : `calc(50% + ${offset}px)`;
+      xPos = action === 'back' ? `calc(50% - ${offset}px)` : `calc(50% + ${offset}px)`;
       yPos = '50%';
     }
 
-    // Arrow shows the action direction (where you're going)
-    // Default arrow points right (▶), so:
-    // - BACK (◀) = rotate 180deg
-    // - FORWARD (▶) = no rotation
     const arrowRotation = action === 'forward' ? 'rotate(0deg)' : 'rotate(180deg)';
-    // Text shows what will happen
     const labelText = action === 'back' ? 'BACK' : 'FORWARD';
 
     indicator = document.createElement('div');
@@ -114,7 +109,6 @@
       box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
     `;
 
-    // Add arrow and text
     const content = document.createElement('div');
     content.style.cssText = `
       display: flex !important;
@@ -146,16 +140,10 @@
     content.appendChild(label);
 
     indicator.appendChild(content);
-
     document.documentElement.appendChild(indicator);
 
-    // Auto-remove after timeout
     clearTimeout(indicatorTimeout);
     indicatorTimeout = setTimeout(removeIndicator, 600);
-  }
-
-  function updateIndicator(direction) {
-    // No longer needed - everything handled in createIndicator
   }
 
   function removeIndicator() {
@@ -170,12 +158,21 @@
     }
   }
 
+  // Navigate via background service worker for reliable cross-origin navigation
+  function navigate(action) {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({ type: 'gesture', action: action }, () => {
+        // Ignore response errors (e.g. if extension context invalidated)
+        if (chrome.runtime.lastError) { /* noop */ }
+      });
+    }
+  }
+
   // Handle wheel event for gesture detection
   function handleWheel(e) {
-    // Skip if disabled
     if (!settings.enabled) return;
 
-    // Skip if in editable elements (user might be scrolling)
+    // Skip if in editable elements
     const target = e.target;
     if (target && (
       target.tagName === 'TEXTAREA' ||
@@ -188,12 +185,9 @@
 
     // Detect horizontal scroll (two-finger swipe)
     if (e.deltaX !== 0) {
-      // Reset timeout
       clearTimeout(wheelTimeout);
-
       accumulatedDeltaX += e.deltaX;
 
-      // Set timeout to detect end of gesture
       wheelTimeout = setTimeout(() => {
         const now = Date.now();
         const timeSinceLastGesture = now - lastGestureTime;
@@ -206,38 +200,22 @@
 
         // Check if threshold met
         if (Math.abs(accumulatedDeltaX) >= settings.sensitivity) {
-          // Track the actual swipe direction before any reversal
           const swipeDirection = accumulatedDeltaX > 0 ? 'right' : 'left';
           let actionDirection = swipeDirection;
 
-          // Reverse if setting enabled
           if (settings.reverseDirection) {
             actionDirection = swipeDirection === 'right' ? 'left' : 'right';
           }
 
-          // Right swipe = back, Left swipe = forward
-          // (Swipe right means moving content right, like going back in history)
           const action = actionDirection === 'right' ? 'back' : 'forward';
 
-          // For the indicator, show what WILL happen
           createIndicator(action);
-
-          // Navigate directly
-          try {
-            if (action === 'back') {
-              window.history.back();
-            } else if (action === 'forward') {
-              window.history.forward();
-            }
-          } catch (err) {
-            console.log('Navigation error:', err);
-          }
-
+          navigate(action);
           lastGestureTime = now;
         }
 
         accumulatedDeltaX = 0;
-      }, 150); // Wait for gesture to complete
+      }, 150);
     }
   }
 
@@ -245,7 +223,7 @@
   loadSettings();
   document.addEventListener('wheel', handleWheel, { passive: true });
 
-  // Re-load settings when page becomes visible (in case settings changed)
+  // Re-load settings when page becomes visible
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       loadSettings();

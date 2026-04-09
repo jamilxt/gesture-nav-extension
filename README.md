@@ -132,7 +132,8 @@ The extension monitors horizontal scroll events (`wheel` event with `deltaX`) to
 ```
 gesture-nav-extension/
 ├── manifest.json       # Extension manifest v3
-├── background.js       # Service worker
+├── constants.js       # Shared default settings and validation
+├── background.js       # Service worker (navigation handler)
 ├── content.js         # Gesture detection script (injected into pages)
 ├── popup.html         # Extension popup UI
 ├── popup.js           # Popup functionality

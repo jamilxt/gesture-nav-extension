@@ -1,16 +1,5 @@
 // Two-Finger Gesture Navigation - Options Page Script
-
-// Default settings
-const DEFAULT_SETTINGS = {
-  enabled: true,
-  sensitivity: 100,
-  cooldown: 300,
-  reverseDirection: true,
-  showIndicator: false,
-  indicatorColor: '#4285f4',
-  indicatorSize: 60,
-  indicatorPosition: 'bottom-right'
-};
+// Depends on constants.js (loaded before this script)
 
 // DOM Elements
 const elements = {
@@ -26,27 +15,33 @@ const elements = {
   indicatorSizeValue: document.getElementById('indicatorSizeValue'),
   indicatorPosition: document.getElementById('indicatorPosition'),
   demoIndicator: document.getElementById('demoIndicator'),
-  saveStatus: document.getElementById('saveStatus')
+  saveStatus: document.getElementById('saveStatus'),
+  versionText: document.getElementById('versionText')
 };
 
 // Load current settings
 function loadSettings() {
   chrome.storage.local.get(DEFAULT_SETTINGS, (settings) => {
-    // Apply settings to form
-    elements.enabled.checked = settings.enabled;
-    elements.reverseDirection.checked = settings.reverseDirection;
-    elements.sensitivity.value = settings.sensitivity;
-    elements.sensitivityValue.textContent = settings.sensitivity;
-    elements.cooldown.value = settings.cooldown;
-    elements.cooldownValue.textContent = settings.cooldown;
-    elements.showIndicator.checked = settings.showIndicator;
-    elements.indicatorColor.value = settings.indicatorColor;
-    elements.indicatorSize.value = settings.indicatorSize;
-    elements.indicatorSizeValue.textContent = settings.indicatorSize;
-    elements.indicatorPosition.value = settings.indicatorPosition || 'sides';
+    if (chrome.runtime.lastError) {
+      console.error('Failed to load settings:', chrome.runtime.lastError.message);
+      return;
+    }
 
-    // Update preview
-    updatePreview(settings);
+    const validated = validateSettings(settings);
+
+    elements.enabled.checked = validated.enabled;
+    elements.reverseDirection.checked = validated.reverseDirection;
+    elements.sensitivity.value = validated.sensitivity;
+    elements.sensitivityValue.textContent = validated.sensitivity;
+    elements.cooldown.value = validated.cooldown;
+    elements.cooldownValue.textContent = validated.cooldown;
+    elements.showIndicator.checked = validated.showIndicator;
+    elements.indicatorColor.value = validated.indicatorColor;
+    elements.indicatorSize.value = validated.indicatorSize;
+    elements.indicatorSizeValue.textContent = validated.indicatorSize;
+    elements.indicatorPosition.value = validated.indicatorPosition;
+
+    updatePreview(validated);
   });
 }
 
@@ -55,18 +50,31 @@ function saveSettings() {
   const settings = {
     enabled: elements.enabled.checked,
     reverseDirection: elements.reverseDirection.checked,
-    sensitivity: parseInt(elements.sensitivity.value),
-    cooldown: parseInt(elements.cooldown.value),
+    sensitivity: parseInt(elements.sensitivity.value, 10),
+    cooldown: parseInt(elements.cooldown.value, 10),
     showIndicator: elements.showIndicator.checked,
     indicatorColor: elements.indicatorColor.value,
-    indicatorSize: parseInt(elements.indicatorSize.value),
+    indicatorSize: parseInt(elements.indicatorSize.value, 10),
     indicatorPosition: elements.indicatorPosition.value
   };
 
-  chrome.storage.local.set(settings, () => {
+  const validated = validateSettings(settings);
+
+  chrome.storage.local.set(validated, () => {
+    if (chrome.runtime.lastError) {
+      console.error('Failed to save settings:', chrome.runtime.lastError.message);
+      return;
+    }
     showSaveStatus();
-    updatePreview(settings);
+    updatePreview(validated);
   });
+}
+
+// Debounce utility for range sliders
+let saveDebounceTimer = null;
+function debouncedSave() {
+  clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(saveSettings, 250);
 }
 
 // Show save status notification
@@ -86,29 +94,33 @@ function updatePreview(settings) {
   demo.style.opacity = settings.showIndicator ? '1' : '0.3';
 }
 
-// Event listeners
+// Event listeners — toggles save immediately, sliders are debounced
 elements.enabled.addEventListener('change', saveSettings);
 elements.reverseDirection.addEventListener('change', saveSettings);
 elements.showIndicator.addEventListener('change', saveSettings);
+elements.indicatorPosition.addEventListener('change', saveSettings);
 
 elements.sensitivity.addEventListener('input', (e) => {
   elements.sensitivityValue.textContent = e.target.value;
-  saveSettings();
+  debouncedSave();
 });
 
 elements.cooldown.addEventListener('input', (e) => {
   elements.cooldownValue.textContent = e.target.value;
-  saveSettings();
+  debouncedSave();
 });
 
-elements.indicatorColor.addEventListener('input', saveSettings);
+elements.indicatorColor.addEventListener('input', debouncedSave);
 
 elements.indicatorSize.addEventListener('input', (e) => {
   elements.indicatorSizeValue.textContent = e.target.value;
-  saveSettings();
+  debouncedSave();
 });
 
-elements.indicatorPosition.addEventListener('change', saveSettings);
+// Set dynamic version from manifest
+if (elements.versionText) {
+  elements.versionText.textContent = 'v' + chrome.runtime.getManifest().version;
+}
 
 // Initialize
 loadSettings();
