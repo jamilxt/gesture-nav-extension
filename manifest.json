@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Two-Finger Gesture Navigation",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Navigate forward/backward with two-finger swipe gestures, just like on macOS",
   "permissions": [
     "storage",
@@ -13,9 +13,9 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": ["constants.js", "content.js"],
       "run_at": "document_start",
-      "all_frames": true
+      "all_frames": false
     }
   ],
   "action": {
@@ -36,5 +36,19 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "commands": {
+    "go-back": {
+      "suggested_key": {
+        "default": "Alt+Left"
+      },
+      "description": "Navigate back"
+    },
+    "go-forward": {
+      "suggested_key": {
+        "default": "Alt+Right"
+      },
+      "description": "Navigate forward"
+    }
   }
 }

@@ -20,7 +20,9 @@ A Chrome extension that brings macOS-like two-finger swipe navigation to Chrome.
 
 ### From Chrome Web Store (Recommended)
 
-> Coming soon!
+[![Available in the Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install-blue?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/two-finger-gesture-naviga/gkjmhkekgfahedjajjallabnnjpibgdh)
+
+[**Install from Chrome Web Store →**](https://chromewebstore.google.com/detail/two-finger-gesture-naviga/gkjmhkekgfahedjajjallabnnjpibgdh)
 
 ### From Source (Developer Mode)
 
@@ -130,7 +132,8 @@ The extension monitors horizontal scroll events (`wheel` event with `deltaX`) to
 ```
 gesture-nav-extension/
 ├── manifest.json       # Extension manifest v3
-├── background.js       # Service worker
+├── constants.js       # Shared default settings and validation
+├── background.js       # Service worker (navigation handler)
 ├── content.js         # Gesture detection script (injected into pages)
 ├── popup.html         # Extension popup UI
 ├── popup.js           # Popup functionality

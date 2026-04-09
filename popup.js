@@ -11,8 +11,30 @@ const openOptions = document.getElementById('openOptions');
 // Load current settings and update UI
 function loadSettings() {
   chrome.storage.local.get({ enabled: true }, (settings) => {
+    if (chrome.runtime.lastError) {
+      console.error('Failed to load settings:', chrome.runtime.lastError.message);
+      return;
+    }
     enableToggle.checked = settings.enabled;
     updateStatus(settings.enabled);
+  });
+}
+
+// Check if current tab is a restricted page where the extension cannot run
+function checkCurrentTab() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (chrome.runtime.lastError || !tabs[0]) return;
+
+    const url = tabs[0].url || tabs[0].pendingUrl || '';
+    const restrictedSchemes = ['chrome://', 'chrome-extension://', 'edge://', 'about:'];
+    if (url && restrictedSchemes.some(scheme => url.startsWith(scheme))) {
+      statusIndicator.classList.add('disabled');
+      statusText.textContent = 'Cannot run on this page';
+      testBack.disabled = true;
+      testForward.disabled = true;
+      testBack.style.opacity = '0.5';
+      testForward.style.opacity = '0.5';
+    }
   });
 }
 
@@ -31,6 +53,10 @@ function updateStatus(enabled) {
 enableToggle.addEventListener('change', (e) => {
   const enabled = e.target.checked;
   chrome.storage.local.set({ enabled }, () => {
+    if (chrome.runtime.lastError) {
+      console.error('Failed to save settings:', chrome.runtime.lastError.message);
+      return;
+    }
     updateStatus(enabled);
   });
 });
@@ -38,17 +64,15 @@ enableToggle.addEventListener('change', (e) => {
 // Test navigation buttons
 testBack.addEventListener('click', () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]) {
-      chrome.tabs.goBack(tabs[0].id);
-    }
+    if (chrome.runtime.lastError || !tabs[0]) return;
+    chrome.tabs.goBack(tabs[0].id).catch(() => {});
   });
 });
 
 testForward.addEventListener('click', () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]) {
-      chrome.tabs.goForward(tabs[0].id);
-    }
+    if (chrome.runtime.lastError || !tabs[0]) return;
+    chrome.tabs.goForward(tabs[0].id).catch(() => {});
   });
 });
 
@@ -60,3 +84,4 @@ openOptions.addEventListener('click', (e) => {
 
 // Initialize
 loadSettings();
+checkCurrentTab();
