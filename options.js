@@ -119,7 +119,7 @@ elements.indicatorSize.addEventListener('input', (e) => {
 
 // Set dynamic version from manifest
 if (elements.versionText) {
-  elements.versionText.textContent = 'v' + chrome.runtime.getManifest().version;
+  elements.versionText.textContent = `v${chrome.runtime.getManifest().version}`;
 }
 
 // Initialize

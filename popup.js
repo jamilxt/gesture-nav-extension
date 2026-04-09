@@ -26,8 +26,8 @@ function checkCurrentTab() {
     if (chrome.runtime.lastError || !tabs[0]) return;
 
     const url = tabs[0].url || tabs[0].pendingUrl || '';
-    // url may be empty if we lack permission to read it — skip the check in that case
-    if (url && (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('edge://') || url.startsWith('about:'))) {
+    const restrictedSchemes = ['chrome://', 'chrome-extension://', 'edge://', 'about:'];
+    if (url && restrictedSchemes.some(scheme => url.startsWith(scheme))) {
       statusIndicator.classList.add('disabled');
       statusText.textContent = 'Cannot run on this page';
       testBack.disabled = true;

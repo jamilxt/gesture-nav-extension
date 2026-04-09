@@ -28,7 +28,7 @@ async function handleGesture(action, tab) {
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    chrome.storage.local.set({ ...DEFAULT_SETTINGS }, () => {
+    chrome.storage.local.set(DEFAULT_SETTINGS, () => {
       if (chrome.runtime.lastError) {
         console.error('Failed to save default settings:', chrome.runtime.lastError.message);
         return;

@@ -41,8 +41,8 @@ function validateSettings(raw) {
     }
   }
 
-  // Color - basic hex validation
-  if (typeof raw.indicatorColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(raw.indicatorColor)) {
+  // Color - basic hex validation (supports #abc and #aabbcc)
+  if (typeof raw.indicatorColor === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(raw.indicatorColor)) {
     settings.indicatorColor = raw.indicatorColor;
   }
 
